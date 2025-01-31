@@ -1,10 +1,37 @@
 # compose versions are no longer needed for Compose CLI
 
 services:
+  proxy:
+    image: traefik:v2.10
+    command:
+      - --api
+      - --providers.docker=true
+      - --providers.docker.watch=true
+      - --providers.docker.exposedByDefault=false 
+      - --entryPoints.http.address=:80   
+      - --entryPoints.https.address=:443   
+    ports:
+      - "8080:80"
+      - "443:443"    
+      - "80:80"      
+    labels:
+      - traefik.port=8080
+      - traefik.frontend.rule=Host:traefik.localhost
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - backend
+      - frontend
+
   redis:
     image: redis:alpine
     networks:
       - frontend
+    healthcheck:
+      test: ["CMD", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5 
 
   db:
     image: postgres:15-alpine
@@ -15,24 +42,50 @@ services:
       - db-data:/var/lib/postgresql/data
     networks:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   vote:
     image: bretfisher/examplevotingapp_vote
+    depends_on:
+      - redis
     ports:
       - '5000:80'
     networks:
       - frontend
+    labels:
+    - traefik.port=8080
+    - traefik.frontend.rule=Host:vote.localhost
 
   result:
+    depends_on:
+      - db
     build: 
-      context: result
+      context1: result
+    command: nodemon --inspect=0.0.0.0:9229 server.js
     ports:
       - '5001:80'
+      - '9229:9229'
+    volumes:
+      - ./result:/app
+      - /app/node_modules
+    environment:
+      - DEBUG=result:*
+      - NODE_ENV=development
     networks:
       - backend
+    labels:
+      - traefik.port=80
+      - traefik.frontend.rule=Host:result.localhost
 
   worker:
     image: bretfisher/examplevotingapp_worker
+    depends_on:
+      - db
+      - redis
     networks:
       - frontend
       - backend

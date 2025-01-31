@@ -1,15 +1,10 @@
-FROM node:10-slim
-
-EXPOSE 3000
-
-WORKDIR /node
-
-COPY package*.json ./
-
-RUN npm install && npm cache clean --force
-
-WORKDIR /node/app
-
+FROM node:lts-alpine
+ENV NODE_ENV=production
+WORKDIR /usr/src/app
+COPY ["package.json", "package-lock.json*", "npm-shrinkwrap.json*", "./"]
+RUN npm install --production --silent && mv node_modules ../
 COPY . .
-
-CMD ["node", "app.js"]
+EXPOSE 3000
+RUN chown -R node /usr/src/app
+USER node
+CMD ["npm", "start"]

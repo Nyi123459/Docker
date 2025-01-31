@@ -8,7 +8,7 @@ COPY package*.json ./
 RUN npm ci \
     && npm cache clean --force
 COPY . .
-CMD ["node", "./bin/www"]
+CMD ["node", "./bin/www"] 
 
 FROM prod as dev
 ENV NODE_ENV=development
